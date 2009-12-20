@@ -33,9 +33,9 @@ describe Chef::Application::Knife do
       lambda { @knife.run }.should raise_error(SystemExit) { |e| e.status.should == 1 }
     end
 
-    it "should exit 2 if run without a sub command" do
+    it "should exit 1 if run without a sub command" do
       redefine_argv([ "--user", "adam" ])
-      lambda { @knife.run }.should raise_error(SystemExit) { |e| e.status.should == 2 }
+      lambda { @knife.run }.should raise_error(SystemExit) { |e| e.status.should == 1 }
     end
 
     it "should run a sub command with the applications command line option prototype" do
