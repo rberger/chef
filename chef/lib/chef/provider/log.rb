@@ -1,6 +1,6 @@
 #
-# Author:: Adam Jacob (<adam@opscode.com>)
-# Copyright:: Copyright (c) 2009 Opscode, Inc.
+# Author:: Cary Penniman (<cary@rightscale.com>)
+# Copyright:: Copyright (c) 2008 Opscode, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,27 +16,37 @@
 # limitations under the License.
 #
 
-require 'chef/knife'
-require 'chef/data_bag'
-
 class Chef
-  class Knife
-    class DataBagCreate < Knife
 
-      banner "Sub-Command: data bag create BAG [ITEM] (options)"
+  class Provider
 
-      def run 
-        if @name_args.length == 2
-          create_object({ "id" => @name_args[1] }, "data_bag_item[#{@name_args[1]}]") do |output|
-            rest.post_rest("data/#{@name_args[0]}", output)
-          end
-        else
-          rest.post_rest("data", { "name" => @name_args[0] })
-          Chef::Log.info("Created data_bag[#{@name_args[0]}]")
+    class Log
+
+      # Chef log provider, allows logging to chef's logs from recipes
+      class ChefLog < Chef::Provider
+
+        # No concept of a 'current' resource for logs, this is a no-op
+        #
+        # === Return
+        # true:: Always return true
+        def load_current_resource
+          true
         end
+      
+        # Write the log to Chef's log
+        #
+        # === Return
+        # true:: Always return true
+        def action_write
+          Chef::Log.send(@new_resource.level, @new_resource.name)
+        end
+
       end
+
     end
+
   end
+
 end
 
 
