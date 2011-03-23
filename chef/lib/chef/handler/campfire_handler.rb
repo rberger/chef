@@ -17,6 +17,11 @@
 #
 # See Also
 #  http://wiki.opscode.com/display/chef/Exception+and+Report+Handlers
+#  https://github.com/ajsharp/campfire_notifier
+#  https://github.com/jnunemaker/httparty
+#  https://github.com/mojotech/hipchat/blob/master/lib/hipchat/chef.rb
+#  https://github.com/morgoth/hoptoad_handler
+#  
 #
 # Requirements
 #  HTTParty gem: $ sudo gem install httparty
