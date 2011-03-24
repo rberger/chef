@@ -25,15 +25,14 @@
 # Usage
 #  1. Add these four lines to your /etc/chef/client.rb
 #     require 'cloudkick_handler'
-#     ck_handler = CloudkickHandler.new(:CONSUMER_KEY => 'xxx', :CONSUMER_SECRET => 'xxx', :node_id => 'abc', :check_id => 'xyz')
+#     ck_handler = CloudkickHandler.new(:CONSUMER_KEY => 'xxx', :CONSUMER_SECRET => 'xxx', :check_id => 'xyz')
 #     exception_handlers << ck_handler
 #     report_handlers << ck_handler
 #  2. Copy this file into /var/chef/handler/
 #
 # TODO
-#  1. Add discovery of node_id.
-#  2. Add petrics from report_handler to Cloudkick check.
-#  3. Document creating Cloudkick check.
+#  1. Add petrics from report_handler to Cloudkick check.
+#  2. Document creating Cloudkick check.
 # 
 
 require "chef"
@@ -57,6 +56,6 @@ class CloudkickHandler < Chef::Handler
       status = 'ok'
       details = 'all good'
     end
-    OAuth::AccessToken.new( OAuth::Consumer.new(@config[:CONSUMER_KEY], @config[:CONSUMER_SECRET], :site => 'https://api.cloudkick.com', :http_method => :get) ).post("/2.0/check/#{@config[:check_id]}/update_status", { :status => status, :node_id => @config[:node_id], :details => details } )
+    OAuth::AccessToken.new( OAuth::Consumer.new(@config[:CONSUMER_KEY], @config[:CONSUMER_SECRET], :site => 'https://api.cloudkick.com', :http_method => :get) ).post("/2.0/check/#{@config[:check_id]}/update_status", { :status => status, :node_id => node[:cloudkick][:data][:id], :details => details } )
   end
 end
