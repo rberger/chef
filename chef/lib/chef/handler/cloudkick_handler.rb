@@ -1,62 +1,140 @@
-#
-# Author:: Greg Albrecht (<gba@gregalbrecht.com>)
-# Copyright:: Copyright (c) 2011 Splunk, Inc. 
-# License:: Apache License, Version 2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# See Also
-#  http://wiki.opscode.com/display/chef/Exception+and+Report+Handlers
-#  https://github.com/philk/cloudkick-gem/tree/v2api
-#
-# Requirements
-#  OAuth gem: $ sudo gem install oauth
-#
-# Usage
-#  1. Add these four lines to your /etc/chef/client.rb
-#     require 'cloudkick_handler'
-#     ck_handler = CloudkickHandler.new(:CONSUMER_KEY => 'xxx', :CONSUMER_SECRET => 'xxx', :node_id => 'abc', :check_id => 'xyz')
-#     exception_handlers << ck_handler
-#     report_handlers << ck_handler
-#  2. Copy this file into /var/chef/handler/
-#
-# TODO
-#  1. Add discovery of node_id.
-#  2. Add petrics from report_handler to Cloudkick check.
-#  3. Document creating Cloudkick check.
-# 
-
-require "chef"
-require "chef/handler"
 require 'rubygems'
-require 'oauth'
-require 'openssl'
+require 'cloudkick'
+require 'json'
+require 'timeout'
 
-class CloudkickHandler < Chef::Handler
+module MC
+  class CloudkickHandler < Chef::Handler
 
-  def initialize(opts = {})
-    @config = opts
-  end
-
-  def report
-    Chef::Log.info("Creating Cloudkick Report...")
-    if run_status.failed?
-      status = 'err'
-      details = run_status.formatted_exception
-    else
-      status = 'ok'
-      details = 'all good'
+    CHECK_NAME = 'chef-clientRun'
+    TIMEOUT = 10
+    def initialize(oauth_key, oauth_secret)
+      @ckclient = nil
+      @cknode = nil
+      @oauth_key = oauth_key
+      @oauth_secret = oauth_secret
     end
-    OAuth::AccessToken.new( OAuth::Consumer.new(@config[:CONSUMER_KEY], @config[:CONSUMER_SECRET], :site => 'https://api.cloudkick.com', :http_method => :get) ).post("/2.0/check/#{@config[:check_id]}/update_status", { :status => status, :node_id => @config[:node_id], :details => details } )
+
+    def connect
+      @ckclient = Cloudkick::Base.new(@oauth_key, @oauth_secret)
+      @cknode_id = get_node_id
+      @check_id = get_check_id
+    end
+
+    def reset
+      @ckclient = nil
+      @cknode = nil
+      @check_id = nil
+    end
+
+    def report
+      begin
+
+        Timeout::timeout(TIMEOUT) do
+          if not @ckclient or not @cknode_id or not @check_id
+            connect
+          end
+          if not @ckclient or not @cknode_id or not @check_id
+            return
+          end
+
+          status = { }
+          if run_status.success?
+            status['status'] = 'ok'
+            status['details'] = 'Chef run completed in ' + run_status.elapsed_time.to_s
+          else
+            status['status']= 'err'
+            status['details'] = 'Chef run failed: ' + run_status.formatted_exception
+          end
+          if run_status.elapsed_time
+            elapsed_time = run_status.elapsed_time.to_s
+          else
+            elapsed_time = 0
+          end
+
+          if run_status.all_resources
+            all_resources_length = run_status.all_resources.length.to_s
+          else
+            all_resources_length = 0
+          end
+
+          if run_status.updated_resources
+            updated_resources_length = run_status.updated_resources.length.to_s
+          else
+            updated_resources_length = 0
+          end
+
+
+          metrics = [ ]
+          metrics << { 'metric_name' => 'elapsed_time',
+                       'value' => elapsed_time,
+                       'check_type' => 'float' }
+          metrics << { 'metric_name' => 'all_resources',
+                       'value' => all_resources_length,
+                       'check_type' => 'int' }
+          metrics << { 'metric_name' => 'updated_resources',
+                       'value' => updated_resources_length,
+                       'check_type' => 'int' }
+
+          begin
+            send_status(status)
+            send_metrics(metrics)
+          rescue
+            return
+          end
+        end
+      rescue Timeout::Error
+        reset
+      end
+    end
+
+    def send_status(status)
+      status['node_id'] = @cknode_id.to_s
+      resp, data = @ckclient.access_token.post('/2.0/check/' + @check_id + '/update_status', status)
+      if not resp.code =~ /^2/
+        reset
+      end
+    end
+
+    def send_metrics(metrics)
+      metrics.each do |m|
+        m['node_id'] = @cknode_id.to_s
+        resp, data = @ckclient.access_token.post('/2.0/data/check/' + @check_id, m)
+        if not resp.code =~ /^2/
+          reset
+          return
+        end
+      end
+    end
+
+    def get_node_id
+      resp, data = @ckclient.access_token.get("/2.0/nodes?query=node:#{node.fqdn}")
+      if not resp.code =~ /^2/
+        reset
+        return nil
+      end
+      parsed = JSON::parse(data)
+      if parsed['items'].first['name'] == node.fqdn
+        return parsed['items'].first['id']
+      end
+      return nil
+    end
+
+    def get_check_id
+      resp, data = @ckclient.access_token.get('/2.0/checks')
+      if not resp.code =~ /^2/
+        raise Exception, "received " + resp.code.to_s + " on list checks"
+        reset
+        return nil
+      end
+      parsed = JSON::parse(data)
+
+      parsed['items'].each do |item|
+        if CHECK_NAME == item['details']['name']
+          return item['id']
+        end
+      end
+      return nil
+    end
   end
 end
