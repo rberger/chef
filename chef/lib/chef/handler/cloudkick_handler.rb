@@ -1,3 +1,42 @@
+#
+# Author:: Michael Leinartas (<@mleinart>)
+# Updated by:: Greg Albrecht (<gba@gregalbrecht.com>)
+# Copyright:: Copyright (c) 2011 Michael Leinartas
+#
+# See Also
+#  http://wiki.opscode.com/display/chef/Exception+and+Report+Handlers
+#  https://support.cloudkick.com/API/2.0
+#  https://github.com/cloudkick/cloudkick-gem
+#
+# History
+#  http://twitter.com/#!/ampledata/status/50718248886480896
+#  http://twitter.com/#!/mleinart/status/50748954815635457
+#  http://twitter.com/#!/ampledata/status/50991223296626688
+#  http://twitter.com/#!/mleinart/status/51287128054841344
+#  https://gist.github.com/886900
+#  https://gist.github.com/890985
+#
+# Requirements
+#  Cloudkick gem: $ sudo gem install cloudkick
+#  JSON gem: $ sudo gem install json
+#
+# Usage
+#  I. On the chef-client:
+#    1. Add these four lines to your /etc/chef/client.rb, 
+#       replacing "YOUR API KEY" and "YOUR API SECRET":
+#         require '/var/chef/handler/cloudkick_handler'
+#         ck_handler = CloudkickHandler.new('YOUR API KEY', 'YOUR API SECRET')
+#         exception_handlers << ck_handler
+#         report_handlers << ck_handler
+#    2. Copy cloudkick_handler.rb into /var/chef/handler/
+#  II. On http://www.cloudkick.com/:
+#    1. Login and select 'Monitor' then 'New Monitor'.
+#    2. Under 'Step 1: name it', 'Name' the monitor "chef client status".
+#    3. Under 'Step 2: add checks', for 'Type' select "HTTPS Push API".
+#    4. Under 'Step 2: add checks', for 'Name' enter "chef-clientRun".
+#    5. Click 'Add check'.
+#
+
 require 'rubygems'
 require 'cloudkick'
 require 'json'
