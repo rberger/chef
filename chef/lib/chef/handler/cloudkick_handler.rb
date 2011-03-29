@@ -107,13 +107,13 @@ class CloudkickHandler < Chef::Handler
   end
 
   def get_node_id
-    resp, data = @ckclient.access_token.get("/2.0/nodes?query=node:#{node[:node_name]}")
+    resp, data = @ckclient.access_token.get("/2.0/nodes?query=node:#{node[:hostname]}")
     if not resp.code =~ /^2/
       reset
       return nil
     end
     parsed = JSON::parse(data)
-    if parsed['items'].first['name'] == node[:node_name]
+    if parsed['items'].first['name'] == node[:hostname]
       return parsed['items'].first['id']
     end
     return nil
